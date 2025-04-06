@@ -46,7 +46,7 @@ namespace Extractor {
         CGameEditorPluginMapMapType@ pmt = editor.PluginMapType;
         CGameEditorGenericInventory@ inventory = pmt.Inventory;
 
-        CGameCtnArticleNodeDirectory@ blocksNode = cast<CGameCtnArticleNodeDirectory@>(inventory.RootNodes[0]);
+        CGameCtnArticleNodeDirectory@ blocksNode = cast<CGameCtnArticleNodeDirectory@>(inventory.RootNodes[1]);
 
         ExploreNode(blocksNode);
         ProcessIndexedBlocks();
@@ -64,10 +64,12 @@ namespace Extractor {
                 if (ana.Article is null || ana.Article.IdName.ToLower().EndsWith("customblock")) {
                     continue;
                 }
+
                 auto block = cast<CGameCtnBlockInfo@>(ana.Article.LoadedNod);
                 if (block is null) { continue; }
 
-
+                
+                if (block.Name == "RoadWaterStraight") print(block.VariantBaseAir.Size.ToString());
 
                 indexedBlocks.InsertLast(block);
             }
@@ -88,16 +90,17 @@ namespace Extractor {
             blockProperties.collection = block.CollectionId_Text;
             blockProperties.author = block.Author.GetName();
     
-            if (block.VariantAir !is null) {
-                blockProperties.size = block.VariantAir.Size;
-            } else if (block.VariantGround !is null) {
-                blockProperties.size = block.VariantGround.Size;
+            if (block.Name == "RoadWaterStraight") print("aaaaa");
+            if (block.VariantBaseAir !is null) {
+                blockProperties.size = block.VariantBaseAir.Size;
+            } else if (block.VariantBaseGround !is null) {
+                blockProperties.size = block.VariantBaseGround.Size;
             } else {
-                blockProperties.size = nat3(0, 0, 0);
+                // blockProperties.size = nat3(0, 0, 0);
             }
 
-            if (block.VariantAir !is null) {
-                switch (block.VariantAir.CardinalDir) {
+            if (block.VariantBaseAir !is null) {
+                switch (block.VariantBaseAir.CardinalDir) {
                     case CGameCtnBlockInfoVariant::ECardinalDirEnum::North:
                         blockProperties.direction = "North";
                         break;
@@ -114,8 +117,8 @@ namespace Extractor {
                         blockProperties.direction = "Unknown";
                         break;
                 }
-            } else if (block.VariantGround !is null) {
-                switch (block.VariantGround.CardinalDir) {
+            } else if (block.VariantBaseGround !is null) {
+                switch (block.VariantBaseGround.CardinalDir) {
                     case CGameCtnBlockInfoVariant::ECardinalDirEnum::North:
                         blockProperties.direction = "North";
                         break;
