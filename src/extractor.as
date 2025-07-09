@@ -1,5 +1,14 @@
+string currentBlockName = "N/A";
+
 namespace Extractor {
-    /* ************************************ */
+
+    class PillarInfo {
+        string name;
+        string author;
+        nat3 size;
+        string blacklistReason;
+    }
+
     class BlockProperties {
         string type;
 
@@ -10,9 +19,7 @@ namespace Extractor {
 
         nat3 size;
 
-        array<string> pillar_placedPillarBlockInfo_Name;
-        array<string> pillar_placedPillarBlockInfo_Author;
-        array<nat3> pillar_placedPillarBlockInfo_Size;
+        array<PillarInfo> pillars;
 
         string waypointType;
         string direction;
@@ -38,10 +45,11 @@ namespace Extractor {
 
         nat3 size; // OOPS: Size does not exist for Items...
         string cardinalDir; // Items do not have a cardinal directions
+        
+        vec3 woldDir;
 
         string waypointType;
 
-        nat3   size;
         string iconQuarterRotationY;
         string catalogPosition;
         string pageName;
@@ -52,6 +60,24 @@ namespace Extractor {
 
     /* ************************************ */
 
+    bool IsPillarIndexBlacklisted(const string &in blockName, int pillarIndex) {
+        if (blockPillarBlacklist.Exists(blockName)) {
+            array<int>@ indices;
+            blockPillarBlacklist.Get(blockName, @indices);
+            if (indices !is null) {
+                for (uint i = 0; i < indices.Length; i++) {
+                    if (indices[i] == pillarIndex) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    bool HasPillarBlacklist(const string &in blockName) {
+        return blockPillarBlacklist.Exists(blockName);
+    }
 
     void Extract() {
         if (GetApp().Editor is null) {
@@ -60,6 +86,7 @@ namespace Extractor {
             return;
         }
 
+        InitializeBlacklist();
         startnew(InventoryPerparation);
     }
 
@@ -212,13 +239,199 @@ namespace Extractor {
                 blockProperties.direction = "Unknown";
             }
 
+            // I hate pillars
 
+            if (block.VariantAir !is null) {
+                auto ppbi_list = block.VariantAir.PlacedPillarBlockInfo_List;
+                if (ppbi_list.Length > 0) {
+                    for (uint j = 0; j < block.VariantAir.PlacedPillarBlockInfo_List.Length; j++) {
 
-            blockProperties.pillar_placedPillarBlockInfo_Author = array<string>();
-            blockProperties.pillar_placedPillarBlockInfo_Name = array<string>();
-            blockProperties.pillar_placedPillarBlockInfo_Size = array<nat3>();
+                        print("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseAir");
+                        currentBlockName = block.Name;
+                        IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseAir");
 
+                        if (IsPillarIndexBlacklisted(block.Name, int(j))) {
+                            log("Skipping blacklisted pillar index " + tostring(j) + " for block: " + block.Name);
+                            
+                            PillarInfo pillarInfo;
+                            pillarInfo.name = "N/A (Index " + tostring(j) + ")";
+                            pillarInfo.author = "N/A";
+                            pillarInfo.size = nat3(0, 0, 0);
+                            pillarInfo.blacklistReason = "Pillar index " + tostring(j) + " was skipped since attempting to read it crashes the game";
+                            blockProperties.pillars.InsertLast(pillarInfo);
+                            continue;
+                        }
 
+                        if (block.VariantAir.PlacedPillarBlockInfo_List[j] is null) {
+                            log("Skipping null ppbi for block: " + block.Name + ", index: " + tostring(j));
+                            continue;
+                        }
+                        
+                        auto ppbi = block.VariantAir.PlacedPillarBlockInfo_List[j];
+                        if (ppbi is null) continue;
+
+                        PillarInfo pillarInfo;
+                        pillarInfo.name = ppbi.Name;
+                        pillarInfo.blacklistReason = "";
+                        pillarInfo.author = ppbi.Author.GetName();
+
+                        if (ppbi.VariantAir !is null) {
+                            pillarInfo.size = ppbi.VariantAir.Size;
+                        } else if (ppbi.VariantGround !is null) {
+                            pillarInfo.size = ppbi.VariantGround.Size;
+                        } else {
+                            pillarInfo.size = nat3(0, 0, 0);
+                        }
+                        
+                        blockProperties.pillars.InsertLast(pillarInfo);
+
+                        yield();
+                    }
+                }
+            } else if (block.VariantGround !is null) {
+                auto ppbi_list = block.VariantGround.PlacedPillarBlockInfo_List;
+                if (ppbi_list.Length > 0) {
+                    for (uint j = 0; j < block.VariantGround.PlacedPillarBlockInfo_List.Length; j++) {
+
+                        print("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseGround");
+                        currentBlockName = block.Name;
+                        IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseGround");
+
+                        if (IsPillarIndexBlacklisted(block.Name, int(j))) {
+                            log("Skipping blacklisted pillar index " + tostring(j) + " for block: " + block.Name);
+                            
+                            PillarInfo pillarInfo;
+                            pillarInfo.name = "N/A (Index " + tostring(j) + ")";
+                            pillarInfo.author = "N/A";
+                            pillarInfo.size = nat3(0, 0, 0);
+                            pillarInfo.blacklistReason = "Pillar index " + tostring(j) + " was skipped since attempting to read it crashes the game";
+                            blockProperties.pillars.InsertLast(pillarInfo);
+                            continue;
+                        }
+
+                        if (block.VariantGround.PlacedPillarBlockInfo_List[j] is null) {
+                            log("Skipping null ppbi for block: " + block.Name + ", index: " + tostring(j));
+                            continue;
+                        }
+                        
+                        auto ppbi = block.VariantGround.PlacedPillarBlockInfo_List[j];
+                        if (ppbi is null) continue;
+
+                        PillarInfo pillarInfo;
+                        pillarInfo.name = ppbi.Name;
+                        pillarInfo.blacklistReason = "";
+                        pillarInfo.author = ppbi.Author.GetName();
+
+                        if (ppbi.VariantAir !is null) {
+                            pillarInfo.size = ppbi.VariantAir.Size;
+                        } else if (ppbi.VariantGround !is null) {
+                            pillarInfo.size = ppbi.VariantGround.Size;
+                        } else {
+                            pillarInfo.size = nat3(0, 0, 0);
+                        }
+                        
+                        blockProperties.pillars.InsertLast(pillarInfo);
+
+                        yield();
+                    }
+                }
+            } else if (block.VariantBaseAir !is null) {
+                auto ppbi_list = block.VariantBaseAir.PlacedPillarBlockInfo_List;
+                if (ppbi_list.Length > 0) {
+                    for (uint j = 0; j < block.VariantBaseAir.PlacedPillarBlockInfo_List.Length; j++) {
+
+                        print("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Air");
+                        currentBlockName = block.Name;
+                        IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Air");
+
+                        if (IsPillarIndexBlacklisted(block.Name, int(j))) {
+                            log("Skipping blacklisted pillar index " + tostring(j) + " for block: " + block.Name);
+                            
+                            PillarInfo pillarInfo;
+                            pillarInfo.name = "N/A (Index " + tostring(j) + ")";
+                            pillarInfo.author = "N/A";
+                            pillarInfo.size = nat3(0, 0, 0);
+                            pillarInfo.blacklistReason = "Pillar index " + tostring(j) + " was skipped since attempting to read it crashes the game";
+                            blockProperties.pillars.InsertLast(pillarInfo);
+                            continue;
+                        }
+
+                        if (block.VariantBaseAir.PlacedPillarBlockInfo_List[j] is null) {
+                            log("Skipping null ppbi for block: " + block.Name + ", index: " + tostring(j));
+                            continue;
+                        }
+                        
+                        auto ppbi = block.VariantBaseAir.PlacedPillarBlockInfo_List[j];
+                        if (ppbi is null) continue;
+
+                        PillarInfo pillarInfo;
+                        pillarInfo.name = ppbi.Name;
+                        pillarInfo.blacklistReason = "";
+                        pillarInfo.author = ppbi.Author.GetName();
+
+                        if (ppbi.VariantBaseAir !is null) {
+                            pillarInfo.size = ppbi.VariantBaseAir.Size;
+                        } else if (ppbi.VariantGround !is null) {
+                            pillarInfo.size = ppbi.VariantGround.Size;
+                        } else {
+                            pillarInfo.size = nat3(0, 0, 0);
+                        }
+                        
+                        blockProperties.pillars.InsertLast(pillarInfo);
+
+                        yield();
+                    }
+                }
+            } else if (block.VariantBaseGround !is null) {
+                auto ppbi_list = block.VariantBaseGround.PlacedPillarBlockInfo_List;
+                if (ppbi_list.Length > 0) {
+                    for (uint j = 0; j < block.VariantBaseGround.PlacedPillarBlockInfo_List.Length; j++) {
+
+                        print("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Ground");
+                        currentBlockName = block.Name;
+                        IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Ground");
+
+                        if (IsPillarIndexBlacklisted(block.Name, int(j))) {
+                            log("Skipping blacklisted pillar index " + tostring(j) + " for block: " + block.Name);
+                            
+                            PillarInfo pillarInfo;
+                            pillarInfo.name = "N/A (Index " + tostring(j) + ")";
+                            pillarInfo.author = "N/A";
+                            pillarInfo.size = nat3(0, 0, 0);
+                            pillarInfo.blacklistReason = "Pillar index " + tostring(j) + " was skipped since attempting to read it crashes the game";
+                            blockProperties.pillars.InsertLast(pillarInfo);
+                            continue;
+                        }
+
+                        if (block.VariantBaseGround.PlacedPillarBlockInfo_List[j] is null) {
+                            log("Skipping null ppbi for block: " + block.Name + ", index: " + tostring(j));
+                            continue;
+                        }
+                        
+                        auto ppbi = block.VariantBaseGround.PlacedPillarBlockInfo_List[j];
+                        if (ppbi is null) continue;
+
+                        PillarInfo pillarInfo;
+                        pillarInfo.name = ppbi.Name;
+                        pillarInfo.blacklistReason = "";
+                        pillarInfo.author = ppbi.Author.GetName();
+
+                        if (ppbi.VariantAir !is null) {
+                            pillarInfo.size = ppbi.VariantAir.Size;
+                        } else if (ppbi.VariantBaseGround !is null) {
+                            pillarInfo.size = ppbi.VariantBaseGround.Size;
+                        } else {
+                            pillarInfo.size = nat3(0, 0, 0);
+                        }
+                        
+                        blockProperties.pillars.InsertLast(pillarInfo);
+
+                        yield();
+                    }
+                }
+            }
+
+            // yepp still hate pillars...
 
             switch (block.EdWaypointType) {
                 case CGameCtnBlockInfo::EWayPointType::Start:
@@ -261,7 +474,7 @@ namespace Extractor {
 
             ItemProperties props;
 
-            props.type        = "Item"; // This is a type flag to distinguish between blocks and items
+            props.type        = "Item";
 
             props.name        = item.Name;
             props.description = item.Description;
@@ -284,28 +497,28 @@ namespace Extractor {
             }
             props.pivotRotations = pivotRot;
 
-            props.size                 = item.Size; // OOPS: Size does not exist for Items...
+            props.size                 = nat3(); // OOPS: Size does not exist for Items...
             props.cardinalDir          = "Unknown"; // Items do not have a cardinal directions
 
-            props.cardinalDir = item.DefaultPlacementParam_Head.PlacementClass.WorldDir; // find out what this <----- is xdd
+            props.woldDir = item.DefaultPlacementParam_Head.PlacementClass.WorldDir; // find out what this <----- is xdd
 
             switch (item.WaypointType) {
-                case CGameItemModel::EWayPointType::Start:
+                case CGameItemModel::EnumWaypointType::Start:
                     props.waypointType = "Start";
                     break;
-                case CGameItemModel::EWayPointType::Finish:
+                case CGameItemModel::EnumWaypointType::Finish:
                     props.waypointType = "Finish";
                     break;
-                case CGameItemModel::EWayPointType::Checkpoint:
+                case CGameItemModel::EnumWaypointType::Checkpoint:
                     props.waypointType = "Checkpoint";
                     break;
-                case CGameItemModel::EWayPointType::None:
+                case CGameItemModel::EnumWaypointType::None:
                     props.waypointType = "None";
                     break;
-                case CGameItemModel::EWayPointType::StartFinish:
+                case CGameItemModel::EnumWaypointType::StartFinish:
                     props.waypointType = "StartFinish";
                     break;
-                case CGameItemModel::EWayPointType::Dispenser:
+                case CGameItemModel::EnumWaypointType::Dispenser:
                     props.waypointType = "Dispenser";
                     break;
                 default:
@@ -324,89 +537,115 @@ namespace Extractor {
 
     string saveLocation = IO::FromStorageFolder("Extractor/BlocksProperties.json");
     void SaveToJsonFile() {
-        Json::Value root = Json::Object();
+        Json::Value allArr = Json::Array();
 
-        Json::Value blocksArr = Json::Array();
+        // Add blocks
         for (uint i = 0; i < indexedBlocksProperties.Length; i++) {
             auto bp = indexedBlocksProperties[i];
             Json::Value j = Json::Object();
 
-            j["type"]        = "Block";
-            j["name"]        = bp.name;
+            j["type"] = "block";
+            j["name"] = bp.name;
             j["description"] = bp.description;
-            j["collection"]  = bp.collection;
-            j["author"]      = bp.author;
+            j["collection"] = bp.collection;
+            j["author"] = bp.author;
 
             Json::Value sz = Json::Object();
-                sz["x"] = bp.size.x;
-                sz["y"] = bp.size.y;
-                sz["z"] = bp.size.z;
+            sz["x"] = bp.size.x;
+            sz["y"] = bp.size.y;
+            sz["z"] = bp.size.z;
             j["size"] = sz;
 
-            Json::Value normalized_size = Json::Object();
-            normalized_size["x"] = bp.size.x;
-            normalized_size["y"] = bp.size.y;
-            normalized_size["z"] = bp.size.z;
-            j["size"] = normalized_size;
-
             Json::Value pillar = Json::Array();
-            for (uint i = 0; i < bp.pillar_placedPillarBlockInfo_Name.Length; i++) {
+            for (uint pi = 0; pi < bp.pillars.Length; pi++) {
                 Json::Value pillarEntry = Json::Object();
-                pillarEntry["name"]   = bp.pillar_placedPillarBlockInfo_Name[i];
-                pillarEntry["author"] = bp.pillar_placedPillarBlockInfo_Author[i];
-                
+                pillarEntry["name"] = bp.pillars[pi].name;
+                pillarEntry["author"] = bp.pillars[pi].author;
+
                 Json::Value pillarSize = Json::Object();
-                pillarSize["x"]     = bp.pillar_placedPillarBlockInfo_Size[i].x;
-                pillarSize["y"]     = bp.pillar_placedPillarBlockInfo_Size[i].y;
-                pillarSize["z"]     = bp.pillar_placedPillarBlockInfo_Size[i].z;
+                pillarSize["x"] = bp.pillars[pi].size.x;
+                pillarSize["y"] = bp.pillars[pi].size.y;
+                pillarSize["z"] = bp.pillars[pi].size.z;
                 pillarEntry["size"] = pillarSize;
-                
+
+                pillarEntry["blacklistReason"] = bp.pillars[pi].blacklistReason;
+
                 pillar.Add(pillarEntry);
             }
             j["pillar"] = pillar;
 
-            j["edWaypointType"]       = bp.waypointType;
-            j["direction"]            = bp.direction;
+            j["edWaypointType"] = bp.waypointType;
+            j["direction"] = bp.direction;
             j["iconQuarterRotationY"] = bp.iconQuarterRotationY;
-            j["catalogPosition"]      = bp.catalogPosition;
-            j["pageName"]             = bp.pageName;
+            j["catalogPosition"] = bp.catalogPosition;
+            j["pageName"] = bp.pageName;
 
-            blocksArr.Add(j);
+            allArr.Add(j);
         }
-        root["Blocks"] = blocksArr;
 
-        /*  ITEMS  */
-        Json::Value itemsArr = Json::Array();
+        // Add items
         for (uint i = 0; i < indexedItemsProperties.Length; i++) {
             auto ip = indexedItemsProperties[i];
             Json::Value j = Json::Object();
 
-            j["type"]        = "Item";
-            j["name"]        = ip.name;
+            j["type"] = "item";
+            j["name"] = ip.name;
             j["description"] = ip.description;
-            j["collection"]  = ip.collection;
-            j["author"]      = ip.author;
+            j["collection"] = ip.collection;
+            j["author"] = ip.author;
 
             Json::Value sz = Json::Object();
-                sz["x"] = ip.size.x;
-                sz["y"] = ip.size.y;
-                sz["z"] = ip.size.z;
+            sz["x"] = ip.size.x;
+            sz["y"] = ip.size.y;
+            sz["z"] = ip.size.z;
             j["size"] = sz;
 
-            j["iconQuarterRotationY"] = ip.iconQuarterRotationY;
-            j["catalogPosition"]      = ip.catalogPosition;
-            j["pageName"]             = ip.pageName;
+            Json::Value pivotPosArr = Json::Array();
+            for (uint k = 0; k < ip.pivotPositions.Length; k++) {
+                auto p = ip.pivotPositions[k];
+                Json::Value pv = Json::Object();
+                pv["x"] = p.x;
+                pv["y"] = p.y;
+                pv["z"] = p.z;
+                pivotPosArr.Add(pv);
+            }
+            j["pivotPositions"] = pivotPosArr;
 
-            itemsArr.Add(j);
+            Json::Value pivotRotArr = Json::Array();
+            for (uint k = 0; k < ip.pivotRotations.Length; k++) {
+                auto r = ip.pivotRotations[k];
+                Json::Value rt = Json::Object();
+                rt["x"] = r.x;
+                rt["y"] = r.y;
+                rt["z"] = r.z;
+                rt["w"] = r.w;
+                pivotRotArr.Add(rt);
+            }
+            j["pivotRotations"] = pivotRotArr;
+
+            j["cardinalDir"] = ip.cardinalDir;
+
+            Json::Value woldDirObj = Json::Object();
+            woldDirObj["x"] = ip.woldDir.x;
+            woldDirObj["y"] = ip.woldDir.y;
+            woldDirObj["z"] = ip.woldDir.z;
+            j["woldDir"] = woldDirObj;
+
+            j["waypointType"] = ip.waypointType;
+
+            j["iconQuarterRotationY"] = ip.iconQuarterRotationY;
+            j["catalogPosition"] = ip.catalogPosition;
+            j["pageName"] = ip.pageName;
+
+            allArr.Add(j);
         }
-        root["Items"] = itemsArr;
 
         string folder = IO::FromStorageFolder("Extractor");
         if (!IO::FolderExists(folder)) IO::CreateFolder(folder);
 
         string filePath = folder + "/BlocksAndItemsProperties.json";
-        Json::ToFile(filePath, root, true);
-        log("Saved blocks + items (with type flag) to " + filePath);
+        Json::ToFile(filePath, allArr, true);
+        log("Saved blocks and items together to " + filePath);
     }
 
 }
