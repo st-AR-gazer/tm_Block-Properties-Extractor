@@ -32,6 +32,23 @@ namespace Extractor {
 
     // ----------- //
 
+    // GRASS BLOCKS
+    class GrassProperties {
+        string type;
+
+        string name;
+        string description;
+        string collection;
+        string author;
+
+        nat3 size;
+    }
+
+    array<CGameCtnBlockInfoFlat@> indexedGrass;
+    array<GrassProperties> indexedGrassProperties;
+
+    // ----------- //
+
     class ItemProperties {
         string type;
 
@@ -111,6 +128,18 @@ namespace Extractor {
             log("Inventory has fewer than 2 root nodes; blocks folder missing?");
         }
 
+        /* GRASS : RootNodes[2] */
+        if (inventory.RootNodes.Length > 2) {
+            auto grassNode = cast<CGameCtnArticleNodeDirectory@>(inventory.RootNodes[2]);
+            if (grassNode !is null) {
+                ExploreGrassNode(grassNode);
+            } else {
+                log("RootNodes[2] did not contain a directory (grass).");
+            }
+        } else {
+            log("Inventory has fewer than 3 root nodes; grass folder missing?");
+        }
+
         /* ITEMS : RootNodes[3] */
         if (inventory.RootNodes.Length > 3) {
             auto itemsNode = cast<CGameCtnArticleNodeDirectory@>(inventory.RootNodes[3]);
@@ -123,7 +152,8 @@ namespace Extractor {
             log("Inventory has fewer than 3 root nodes; items folder missing?");
         }
 
-        ProcessIndexedBlocks();
+        // ProcessIndexedBlocks();
+        // ProcessIndexedGrass();
         ProcessIndexedItems();
         SaveToJsonFile();
         log("Finished processing blocks and items.");
@@ -161,13 +191,39 @@ namespace Extractor {
         }
     }
 
-    void ExploreItemNode(CGameCtnArticleNodeDirectory@ parentNode, string _folder = "") {
+    void ExploreGrassNode(CGameCtnArticleNodeDirectory@ parentNode, string _folder = "") {
         for (uint i = 0; i < parentNode.ChildNodes.Length; i++) {
             auto node = parentNode.ChildNodes[i];
-            if (node.IsDirectory) { ExploreItemNode(cast<CGameCtnArticleNodeDirectory@>(node), _folder + node.Name + "/"); continue; }
+            if (node.IsDirectory) { ExploreGrassNode(cast<CGameCtnArticleNodeDirectory@>(node), _folder + node.Name + "/"); continue; }
 
             auto ana = cast<CGameCtnArticleNodeArticle@>(node);
             if (ana.Article is null) continue;
+
+            auto block = cast<CGameCtnBlockInfoFlat@>(ana.Article.LoadedNod);
+            if (block is null) continue;
+            indexedGrass.InsertLast(block);
+        }
+    }
+
+    void ExploreItemNode(CGameCtnArticleNodeDirectory@ parentNode, string _folder = "") {
+        for (uint i = 0; i < parentNode.ChildNodes.Length; i++) {
+            auto node = parentNode.ChildNodes[i];            
+
+            if (!node.Name.StartsWith("Official")) { continue; }
+            
+            if (node.IsDirectory) {
+                ExploreItemNode(cast<CGameCtnArticleNodeDirectory@>(node), _folder + node.Name + "/");
+                continue;
+            }
+
+            auto ana = cast<CGameCtnArticleNodeArticle@>(node);
+            if (ana.Article is null) continue;
+
+            if (ana.Article.LoadedNod is null) {
+                log("Article loaded nod is null for " + ana.Article.IdName);
+                NotifyError("Article loaded nod is null for " + ana.Article.IdName + ", please open a map with all the games items placed before running this script!");
+                continue;
+            }
 
             auto item = cast<CGameItemModel@>(ana.Article.LoadedNod);
             if (item is null) continue;
@@ -465,6 +521,32 @@ namespace Extractor {
         }
     }
 
+    void ProcessIndexedGrass() {
+        log("Processing indexed grass blocks...");
+
+        for (uint i = 0; i < indexedGrass.Length; i++) {
+            auto block = indexedGrass[i];
+            if (block is null) continue;
+
+            BlockProperties blockProperties;
+
+            blockProperties.type = "Grass";
+
+            blockProperties.name = block.Name;
+            blockProperties.description = block.Description;
+            blockProperties.collection = block.CollectionId_Text;
+            blockProperties.author = block.Author.GetName();
+
+            if (block.VariantBaseAir !is null) {
+                blockProperties.size = block.VariantBaseAir.Size;
+            } else if (block.VariantBaseGround !is null) {
+                blockProperties.size = block.VariantBaseGround.Size;
+            } else {
+                // blockProperties.size = nat3(0, 0, 0);
+            }
+        }
+    }
+
     void ProcessIndexedItems() {
         log("Processing indexed items...");
 
@@ -579,6 +661,26 @@ namespace Extractor {
             j["iconQuarterRotationY"] = bp.iconQuarterRotationY;
             j["catalogPosition"] = bp.catalogPosition;
             j["pageName"] = bp.pageName;
+
+            allArr.Add(j);
+        }
+
+        // Add grass
+        for (uint i = 0; i < indexedGrassProperties.Length; i++) {
+            auto bp = indexedGrassProperties[i];
+            Json::Value j = Json::Object();
+
+            j["type"] = "grass";
+            j["name"] = bp.name;
+            j["description"] = bp.description;
+            j["collection"] = bp.collection;
+            j["author"] = bp.author;
+
+            Json::Value sz = Json::Object();
+            sz["x"] = bp.size.x;
+            sz["y"] = bp.size.y;
+            sz["z"] = bp.size.z;
+            j["size"] = sz;
 
             allArr.Add(j);
         }
