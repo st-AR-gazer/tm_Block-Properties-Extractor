@@ -152,8 +152,8 @@ namespace Extractor {
             log("Inventory has fewer than 3 root nodes; items folder missing?");
         }
 
-        // ProcessIndexedBlocks();
-        // ProcessIndexedGrass();
+        ProcessIndexedBlocks();
+        ProcessIndexedGrass();
         ProcessIndexedItems();
         SaveToJsonFile();
         log("Finished processing blocks and items.");
