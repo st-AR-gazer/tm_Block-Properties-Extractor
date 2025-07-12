@@ -208,13 +208,15 @@ namespace Extractor {
     void ExploreItemNode(CGameCtnArticleNodeDirectory@ parentNode, string _folder = "") {
         for (uint i = 0; i < parentNode.ChildNodes.Length; i++) {
             auto node = parentNode.ChildNodes[i];            
-
-            if (!node.Name.StartsWith("Official")) { continue; }
             
+            print(node.Name);
+
             if (node.IsDirectory) {
                 ExploreItemNode(cast<CGameCtnArticleNodeDirectory@>(node), _folder + node.Name + "/");
                 continue;
             }
+
+            if (!_folder.StartsWith("Official")) { continue; }
 
             auto ana = cast<CGameCtnArticleNodeArticle@>(node);
             if (ana.Article is null) continue;
@@ -304,7 +306,8 @@ namespace Extractor {
 
                         print("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseAir");
                         currentBlockName = block.Name;
-                        IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseAir");
+                        // IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseAir");
+                        // Uncomment this line when I need to do some debugging
 
                         if (IsPillarIndexBlacklisted(block.Name, int(j))) {
                             log("Skipping blacklisted pillar index " + tostring(j) + " for block: " + block.Name);
@@ -351,7 +354,7 @@ namespace Extractor {
 
                         print("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseGround");
                         currentBlockName = block.Name;
-                        IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseGround");
+                        // IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: BaseGround");
 
                         if (IsPillarIndexBlacklisted(block.Name, int(j))) {
                             log("Skipping blacklisted pillar index " + tostring(j) + " for block: " + block.Name);
@@ -398,7 +401,7 @@ namespace Extractor {
 
                         print("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Air");
                         currentBlockName = block.Name;
-                        IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Air");
+                        // IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Air");
 
                         if (IsPillarIndexBlacklisted(block.Name, int(j))) {
                             log("Skipping blacklisted pillar index " + tostring(j) + " for block: " + block.Name);
@@ -445,7 +448,7 @@ namespace Extractor {
 
                         print("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Ground");
                         currentBlockName = block.Name;
-                        IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Ground");
+                        // IO::SetClipboard("block: " + block.Name + ", ppbi index: " + tostring(j) + ", variant: Ground");
 
                         if (IsPillarIndexBlacklisted(block.Name, int(j))) {
                             log("Skipping blacklisted pillar index " + tostring(j) + " for block: " + block.Name);
@@ -554,6 +557,8 @@ namespace Extractor {
             auto item = indexedItems[i];
             if (item is null) continue;
 
+            print(item.Name + " - " + item.IdName);
+
             ItemProperties props;
 
             props.type        = "Item";
@@ -617,91 +622,80 @@ namespace Extractor {
     }
 
 
-    string saveLocation = IO::FromStorageFolder("Extractor/BlocksProperties.json");
-    void SaveToJsonFile() {
-        Json::Value allArr = Json::Array();
+    string saveFolder = IO::FromStorageFolder("Extractor");
 
-        // Add blocks
+    void SaveToJsonFile() {
+        if (!IO::FolderExists(saveFolder)) {
+            IO::CreateFolder(saveFolder);
+        }
+
+        Json::Value blocksArr = Json::Array();
         for (uint i = 0; i < indexedBlocksProperties.Length; i++) {
             auto bp = indexedBlocksProperties[i];
             Json::Value j = Json::Object();
-
             j["type"] = "block";
             j["name"] = bp.name;
             j["description"] = bp.description;
             j["collection"] = bp.collection;
             j["author"] = bp.author;
-
             Json::Value sz = Json::Object();
             sz["x"] = bp.size.x;
             sz["y"] = bp.size.y;
             sz["z"] = bp.size.z;
             j["size"] = sz;
-
             Json::Value pillar = Json::Array();
             for (uint pi = 0; pi < bp.pillars.Length; pi++) {
-                Json::Value pillarEntry = Json::Object();
-                pillarEntry["name"] = bp.pillars[pi].name;
-                pillarEntry["author"] = bp.pillars[pi].author;
-
-                Json::Value pillarSize = Json::Object();
-                pillarSize["x"] = bp.pillars[pi].size.x;
-                pillarSize["y"] = bp.pillars[pi].size.y;
-                pillarSize["z"] = bp.pillars[pi].size.z;
-                pillarEntry["size"] = pillarSize;
-
-                pillarEntry["blacklistReason"] = bp.pillars[pi].blacklistReason;
-
-                pillar.Add(pillarEntry);
+                Json::Value pe = Json::Object();
+                pe["name"] = bp.pillars[pi].name;
+                pe["author"] = bp.pillars[pi].author;
+                Json::Value psz = Json::Object();
+                psz["x"] = bp.pillars[pi].size.x;
+                psz["y"] = bp.pillars[pi].size.y;
+                psz["z"] = bp.pillars[pi].size.z;
+                pe["size"] = psz;
+                pe["blacklistReason"] = bp.pillars[pi].blacklistReason;
+                pillar.Add(pe);
             }
             j["pillar"] = pillar;
-
             j["edWaypointType"] = bp.waypointType;
             j["direction"] = bp.direction;
             j["iconQuarterRotationY"] = bp.iconQuarterRotationY;
             j["catalogPosition"] = bp.catalogPosition;
             j["pageName"] = bp.pageName;
-
-            allArr.Add(j);
+            blocksArr.Add(j);
         }
 
-        // Add grass
+        Json::Value grassArr = Json::Array();
         for (uint i = 0; i < indexedGrassProperties.Length; i++) {
-            auto bp = indexedGrassProperties[i];
+            auto gp = indexedGrassProperties[i];
             Json::Value j = Json::Object();
-
             j["type"] = "grass";
-            j["name"] = bp.name;
-            j["description"] = bp.description;
-            j["collection"] = bp.collection;
-            j["author"] = bp.author;
-
+            j["name"] = gp.name;
+            j["description"] = gp.description;
+            j["collection"] = gp.collection;
+            j["author"] = gp.author;
             Json::Value sz = Json::Object();
-            sz["x"] = bp.size.x;
-            sz["y"] = bp.size.y;
-            sz["z"] = bp.size.z;
+            sz["x"] = gp.size.x;
+            sz["y"] = gp.size.y;
+            sz["z"] = gp.size.z;
             j["size"] = sz;
-
-            allArr.Add(j);
+            grassArr.Add(j);
         }
 
-        // Add items
+        Json::Value itemsArr = Json::Array();
         for (uint i = 0; i < indexedItemsProperties.Length; i++) {
             auto ip = indexedItemsProperties[i];
             Json::Value j = Json::Object();
-
             j["type"] = "item";
             j["name"] = ip.name;
             j["description"] = ip.description;
             j["collection"] = ip.collection;
             j["author"] = ip.author;
-
             Json::Value sz = Json::Object();
             sz["x"] = ip.size.x;
             sz["y"] = ip.size.y;
             sz["z"] = ip.size.z;
             j["size"] = sz;
-
             Json::Value pivotPosArr = Json::Array();
             for (uint k = 0; k < ip.pivotPositions.Length; k++) {
                 auto p = ip.pivotPositions[k];
@@ -712,7 +706,6 @@ namespace Extractor {
                 pivotPosArr.Add(pv);
             }
             j["pivotPositions"] = pivotPosArr;
-
             Json::Value pivotRotArr = Json::Array();
             for (uint k = 0; k < ip.pivotRotations.Length; k++) {
                 auto r = ip.pivotRotations[k];
@@ -724,30 +717,25 @@ namespace Extractor {
                 pivotRotArr.Add(rt);
             }
             j["pivotRotations"] = pivotRotArr;
-
             j["cardinalDir"] = ip.cardinalDir;
-
-            Json::Value woldDirObj = Json::Object();
-            woldDirObj["x"] = ip.woldDir.x;
-            woldDirObj["y"] = ip.woldDir.y;
-            woldDirObj["z"] = ip.woldDir.z;
-            j["woldDir"] = woldDirObj;
-
+            Json::Value wobj = Json::Object();
+            wobj["x"] = ip.woldDir.x;
+            wobj["y"] = ip.woldDir.y;
+            wobj["z"] = ip.woldDir.z;
+            j["woldDir"] = wobj;
             j["waypointType"] = ip.waypointType;
-
             j["iconQuarterRotationY"] = ip.iconQuarterRotationY;
             j["catalogPosition"] = ip.catalogPosition;
             j["pageName"] = ip.pageName;
-
-            allArr.Add(j);
+            itemsArr.Add(j);
         }
 
-        string folder = IO::FromStorageFolder("Extractor");
-        if (!IO::FolderExists(folder)) IO::CreateFolder(folder);
-
-        string filePath = folder + "/BlocksAndItemsProperties.json";
-        Json::ToFile(filePath, allArr, true);
-        log("Saved blocks and items together to " + filePath);
+        Json::ToFile(saveFolder + "/BlockData.json", blocksArr, true);
+        Json::ToFile(saveFolder + "/GrassData.json", grassArr, true);
+        Json::ToFile(saveFolder + "/ItemData.json", itemsArr, true);
+        log("Saved block data to " + saveFolder + "/BlockData.json");
+        log("Saved grass data to " + saveFolder + "/GrassData.json");
+        log("Saved item data to " + saveFolder + "/ItemData.json");
     }
 
 }
